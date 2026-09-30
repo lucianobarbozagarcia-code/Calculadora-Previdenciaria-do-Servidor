@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calculadora Previdenciária do Servidor Público</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f7f9;--card:#fff;--tx:#1c2430;--mut:#64707f;--ln:#dde2e8;--ac:#1f5fbf;--ok:#1a7f4b;--bad:#b3261e}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161c;--card:#1b222b;--tx:#e8edf3;--mut:#93a0af;--ln:#2d3743;--ac:#6ea4f0;--ok:#4cc38a;--bad:#f2867f}}
+:root[data-theme="dark"]{--bg:#12161c;--card:#1b222b;--tx:#e8edf3;--mut:#93a0af;--ln:#2d3743;--ac:#6ea4f0;--ok:#4cc38a;--bad:#f2867f}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:0 0 10px}
+.sub{color:var(--mut);margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:16px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 14px}
+label{display:block;font-size:12px;color:var(--mut)}
+input{width:100%;box-sizing:border-box;margin-top:3px;padding:8px;border:1px solid var(--ln);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+.res{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.big{font-size:26px;font-weight:700}
+.row{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px dashed var(--ln)}
+.row span:first-child{color:var(--mut)}
+.bar{height:8px;background:var(--ln);border-radius:4px;overflow:hidden;margin:8px 0}.bar i{display:block;height:100%;background:var(--ac)}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
+details summary{cursor:pointer;font-weight:600}
+small{color:var(--mut)}
+.grid[hidden]{display:none}
+.pbtn{padding:12px 18px;border:0;border-radius:10px;background:var(--ac);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+.tw{max-height:440px;overflow:auto;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--ln);white-space:nowrap}
+th{position:sticky;top:0;background:var(--card);color:var(--mut);font-size:12px}
+th:first-child,td:first-child{text-align:left}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.tabs button{flex:1;min-width:120px;padding:12px;border:1px solid var(--ln);border-radius:10px;background:var(--card);color:var(--tx);font:inherit;font-weight:600;cursor:pointer}
+.tabs button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+</style><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script></head><body><main>
+<h1>Calculadora Previdenciária do Servidor Público</h1>
+<p class="sub">Projeta a renda na aposentadoria em três cenários (Complementar, Média e Integralidade). Valores em R$ mensais.</p>
+<div class="card"><h2>Seus dados</h2><div class="grid" id="g1"></div></div>
+<div class="card"><details><summary>Premissas (alíquotas, tetos e rentabilidade)</summary><div class="grid" id="g2" style="margin-top:12px"></div></details></div>
+<div class="tabs" id="tabs"><button data-s="c" class="on">Complementar</button><button data-s="m">Média</button><button data-s="i">Integralidade</button></div>
+<div class="card"><h2 id="ptitle">Parâmetros do cenário Complementar</h2><div class="grid" id="gc"></div><div class="grid" id="gm" hidden></div><div class="grid" id="gi" hidden></div></div>
+<div class="res" id="out"></div>
+<div style="margin:0 0 16px"><button id="repBtn" class="pbtn">Gerar relatório mensal</button></div>
+<div id="rep"></div>
+<p><small>Simulação educacional baseada na planilha original; não substitui orientação de um profissional. As tabelas de IR e contribuições seguem os valores da planilha e podem estar desatualizadas: ajuste em "Premissas".</small></p>
+<script>
+/*ENGINE*/
+function avgPay(init,ap,ann,n,P){
+  const r=Math.round(Math.pow(1+ann,1/12)*1e6)/1e6;
+  let B=init;for(let i=0;i<n;i++)B=B*r+ap;
+  const y=Math.floor((n-24)/12)+1;let F=0;
+  if(y>=1){F=ap;for(let k=1;k<y;k++)F=F*(1+ann)+ap;}
+  let K=B+F,s=0;
+  for(let j=0;j<P;j++){const L=K/(P-j);s+=L;K=(K-L)*r;}
+  return s/P;
+}
+function calc(p){
+  const E4=p.teto*p.aliqInt-p.pdInt,E5=p.teto-E4,E8=E5*p.aliqIR-p.pdIR,E9=E5-E8;
+  const soma=p.sb+p.rc,E10=Math.min(soma+p.sp,p.teto),E11=soma<p.teto?soma:p.teto;
+  const E15=p.inss*p.aliqInss-p.pdInss,E16=(E11-p.inss)*p.aliqPC;
+  const E17=E10-E15-E16,E21=E17-(E17*p.aliqIR-p.pdIR);
+  const aporteBase=E21-E9,H14=E16*2-E16*2*p.carreg;
+  const B8=p.extra*p.aliqIR,outras=p.outras+p.conj;
+  const sc=(a)=>({...a,n:(a.ret-a.idade)*a.per});
+  const C=sc(p.c),M=sc(p.m),I=sc(p.i);
+  // Complementar
+  const M11=(p.inss-E15)*p.aliqIR-p.pdIR;
+  const pc=avgPay(H14,H14,p.txPC,C.n,p.prazoPC);
+  const cJ4=(p.inss-E15-M11)/12*13+pc*(1-p.irPC);
+  const cJ6=avgPay(C.saldo,C.aporte,p.txPriv,C.n,p.prazoPriv);
+  // Média e Integralidade
+  const mJ4=((E9+p.extra-B8)*13/12)*0.7,mJ6=avgPay(M.saldo,M.aporte,p.txPriv,M.n,p.prazoPriv);
+  const iJ4=E9*13/12,iJ6=avgPay(I.saldo,I.aporte,p.txPriv,I.n,p.prazoPriv);
+  return{H14,aporteBase,
+   c:{atual:E21+p.extra-B8+p.indeniz+outras,tot:cJ4+outras+cJ6,linhas:[["INSS + Previdência Complementar",cJ4],["Outras rendas permanentes",outras],["Renda do investimento privado",cJ6]],alvo:C.alvo,n:C.n},
+   m:{atual:E9+p.extra-B8+p.indeniz+outras+E21/12,tot:mJ4+outras+mJ6,linhas:[["Proventos (70%)",mJ4],["Outras rendas",outras],["Renda do investimento privado",mJ6]],alvo:M.alvo,n:M.n},
+   i:{atual:E9+p.extra-B8+p.indeniz+outras+E21/12,tot:iJ4+outras+iJ6,linhas:[["Proventos (integral)",iJ4],["Outras rendas",outras],["Renda do investimento privado",iJ6]],alvo:I.alvo,n:I.n}};
+}
+/*END*/
+const D={cI:35,cR:70,teto:41845.48,sb:11596,rc:30119,sp:6000,extra:2324,outras:1000,conj:5000,indeniz:3450,
+ inss:8475.55,aliqIR:.275,pdIR:908.73,aliqInt:.19,pdInt:1256.86,aliqInss:.14,pdInss:215.75,aliqPC:.075,carreg:.065,irPC:.1,txPC:.03,txPriv:.05,prazoPC:240,prazoPriv:300,
+ cA:1700,cS:1700,cAlvo:50000,mI:45,mR:68,mS:300000,mA:3500,mAlvo:45000,iI:50,iR:65,iS:500000,iA:2000,iAlvo:45000};
+const F=[["g1",[["teto","Teto remuneratório"],["sb","Salário base"],["rc","Rem. adicional com contrib. previd."],["sp","Rem. adicional sem contrib. previd."],["extra","Extra-teto com IR"],["indeniz","Indenizações"],["outras","Outras rendas"],["conj","Renda do cônjuge"]]],
+["g2",[["inss","Teto INSS"],["aliqInt","Alíq. previd. (integral)"],["pdInt","Parcela dedutível (integral)"],["aliqInss","Alíq. INSS"],["pdInss","Parcela dedutível INSS"],["aliqPC","Alíq. prev. complementar"],["carreg","Taxa de carregamento"],["aliqIR","Alíq. IR"],["pdIR","Parcela dedutível IR"],["irPC","IR sobre prev. compl."],["txPC","Rentab. real a.a. prev. compl."],["txPriv","Rentab. real a.a. invest. privado"],["prazoPC","Meses de recebimento (prev. compl.)"],["prazoPriv","Meses de recebimento (privado)"]]],
+["gc",[["cI","Idade atual"],["cR","Idade de aposentadoria"],["cS","Saldo inicial"],["cA","Aporte mensal"],["cAlvo","Renda-alvo"]]],
+["gm",[["mI","Idade atual"],["mR","Idade de aposentadoria"],["mS","Saldo inicial"],["mA","Aporte mensal"],["mAlvo","Renda-alvo"]]],
+["gi",[["iI","Idade atual"],["iR","Idade de aposentadoria"],["iS","Saldo inicial"],["iA","Aporte mensal"],["iAlvo","Renda-alvo"]]]];
+const pct=new Set(["aliqInt","aliqInss","aliqPC","carreg","aliqIR","irPC","txPC","txPriv"]);
+F.forEach(([g,l])=>{document.getElementById(g).innerHTML=l.map(([k,t])=>`<label>${t}<input id="${k}" type="number" step="any" value="${pct.has(k)?D[k]*100:D[k]}"></label>`).join("")});
+const brl=v=>v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+function get(k){const v=parseFloat(document.getElementById(k).value);const x=isNaN(v)?0:v;return pct.has(k)?x/100:x}
+function run(){
+  const p={};Object.keys(D).forEach(k=>p[k]=get(k));
+  p.per=1;
+  const mk=(i,r,s,a,al,per)=>({idade:i,ret:r,saldo:s,aporte:a,alvo:al,per,n:(r-i)*per});
+  p.c=mk(p.cI,p.cR,p.cS,p.cA,p.cAlvo,13);
+  p.m=mk(p.mI,p.mR,p.mS,p.mA,p.mAlvo,12);
+  p.i=mk(p.iI,p.iR,p.iS,p.iA,p.iAlvo,12);
+  const R=calc(p);
+  const cards=[["c","Complementar",R.c],["m","Média",R.m],["i","Integralidade",R.i]].filter(x=>x[0]===cur).map(([,t,c])=>{
+    const pc=Math.min(100,c.tot/c.alvo*100),ok=c.tot>=c.alvo;
+    return `<div class="card"><h2>${t}</h2><div class="big">${brl(c.tot)}</div>
+    <div class="bar"><i style="width:${pc}%"></i></div>
+    <div class="${ok?"ok":"bad"}">${pc.toFixed(0)}% da renda-alvo de ${brl(c.alvo)} (${ok?"sobra":"falta"} ${brl(Math.abs(c.tot-c.alvo))})</div>
+    <div style="margin-top:8px">${c.linhas.map(([a,b])=>`<div class="row"><span>${a}</span><b>${brl(b)}</b></div>`).join("")}</div></div>`}).join("");
+  document.getElementById("out").innerHTML=cards+`<div class="card"><h2>Referências</h2>
+    <div class="row"><span>Renda líquida mensal atual</span><b>${brl(R[cur].atual)}</b></div>${cur==="c"?`
+    <div class="row"><span>Aporte mensal na prev. complementar</span><b>${brl(R.H14)}</b></div>`:""}</div></div>`;
+  if(showRep)renderRep(p,R);
+}
+let cur="c",showRep=false;
+function series(init,ap,ann,n){const r=Math.round(Math.pow(1+ann,1/12)*1e6)/1e6,a=[init];let B=init;for(let i=0;i<n;i++){B=B*r+ap;a.push(B)}return a}
+function renderRep(p,R){
+  const s=p[cur],isC=cur==="c",priv=series(s.saldo,s.aporte,p.txPriv,s.n),pc=isC?series(R.H14,R.H14,p.txPC,s.n):null;
+  let rows="";
+  for(let t=0;t<=s.n;t++)rows+=`<tr><td>${t===0?"Início":t}</td><td>${(s.idade+t/s.per).toFixed(1).replace(".",",")}</td><td>${brl(priv[t])}</td>${isC?`<td>${brl(pc[t])}</td>`:""}</tr>`;
+  document.getElementById("rep").innerHTML=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px"><h2 style="margin:0">Relatório de acompanhamento mensal: ${NM[cur]}</h2><button class="pbtn" id="pdfBtn">Baixar PDF</button></div><div id="pdfMsg" class="sub" style="margin:0 0 8px"></div>
+  <p class="sub" style="margin-bottom:10px">${s.n} períodos${isC?" (13 por ano, como na planilha)":""}. Saldo final do investimento privado: <b>${brl(priv[s.n])}</b>${isC?`; da prev. complementar: <b>${brl(pc[s.n])}</b>`:""}. Não inclui a reserva do 13º, somada ao saldo no cálculo da renda.</p>
+  <div class="tw"><table><thead><tr><th>Período</th><th>Idade</th><th>Saldo invest. privado</th>${isC?"<th>Saldo prev. complementar</th>":""}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  RP={t:NM[cur],c:cur,isC,s,priv,pc,p};
+  document.getElementById("pdfBtn").addEventListener("click",gerarPdf);
+}
+let RP=null;
+async function gerarPdf(){
+  const msg=document.getElementById("pdfMsg");msg.textContent="";
+  try{
+    if(!window.jspdf){msg.textContent="Não foi possível carregar o gerador de PDF.";return}
+    const{t,isC,s,priv,pc}=RP,d=new window.jspdf.jsPDF({unit:"pt",format:"a4"});
+    const f=v=>brl(v).replace(/\u00a0/g," "),X=isC?[40,130,290,470]:[40,150,340];
+    let y=50;
+    d.setFont("helvetica","bold");d.setFontSize(14);d.text("Relatório de acompanhamento mensal: "+t,40,y);y+=20;
+    d.setFont("helvetica","normal");d.setFontSize(9);
+    const tx=`${s.n} períodos${isC?" (13 por ano, como na planilha)":""}. Saldo final do investimento privado: ${f(priv[s.n])}${isC?"; da prev. complementar: "+f(pc[s.n]):""}. Não inclui a reserva do 13º.`;
+    const ls=d.splitTextToSize(tx,515);d.text(ls,40,y);y+=ls.length*12+8;
+    const head=()=>{d.setFont("helvetica","bold");d.text("Período",X[0],y);d.text("Idade",X[1],y,{align:"right"});d.text("Saldo invest. privado",X[2],y,{align:"right"});if(isC)d.text("Saldo prev. complementar",X[3],y,{align:"right"});d.setFont("helvetica","normal");y+=14};
+    head();
+    for(let i=0;i<=s.n;i++){
+      if(y>800){d.addPage();y=50;head()}
+      d.text(i===0?"Início":String(i),X[0],y);
+      d.text((s.idade+i/s.per).toFixed(1).replace(".",","),X[1],y,{align:"right"});
+      d.text(f(priv[i]),X[2],y,{align:"right"});
+      if(isC)d.text(f(pc[i]),X[3],y,{align:"right"});
+      y+=13;
+    }
+    d.save("relatorio-mensal-"+t.toLowerCase()+".pdf");
+    msg.textContent="PDF gerado.";
+  }catch(e){msg.textContent=e&&e.code==="declined"?"Download cancelado.":"Não foi possível gerar o PDF."+(e&&e.message?" ("+e.message+")":"")}
+}
+document.getElementById("repBtn").addEventListener("click",()=>{showRep=true;run();document.getElementById("rep").scrollIntoView({behavior:"smooth"})});const NM={c:"Complementar",m:"Média",i:"Integralidade"};
+document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>{
+  cur=b.dataset.s;
+  document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x===b));
+  ["c","m","i"].forEach(s=>document.getElementById("g"+s).hidden=s!==cur);
+  document.getElementById("ptitle").textContent="Parâmetros do cenário "+NM[cur];run();}));
+document.querySelectorAll("input").forEach(i=>i.addEventListener("input",run));run();
+</script></main></body></html>
