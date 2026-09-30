@@ -72,18 +72,18 @@ function calc(p){
   // Média e Integralidade
   const mJ4=((E9+p.extra-B8)*13/12)*0.7,mJ6=avgPay(M.saldo,M.aporte,p.txPriv,M.n,p.prazoPriv);
   const iJ4=E9*13/12,iJ6=avgPay(I.saldo,I.aporte,p.txPriv,I.n,p.prazoPriv);
-  return{H14,aporteBase,atual:E21+p.extra-B8+p.indeniz+outras,
-   c:{tot:cJ4+outras+cJ6,linhas:[["INSS + Previdência Complementar",cJ4],["Outras rendas permanentes",outras],["Renda do investimento privado",cJ6]],alvo:C.alvo,n:C.n},
-   m:{tot:mJ4+outras+mJ6,linhas:[["Proventos (70%)",mJ4],["Outras rendas",outras],["Renda do investimento privado",mJ6]],alvo:M.alvo,n:M.n},
-   i:{tot:iJ4+outras+iJ6,linhas:[["Proventos (integral)",iJ4],["Outras rendas",outras],["Renda do investimento privado",iJ6]],alvo:I.alvo,n:I.n}};
+  return{H14,aporteBase,
+   c:{atual:E21+p.extra-B8+p.indeniz+outras,tot:cJ4+outras+cJ6,linhas:[["INSS + Previdência Complementar",cJ4],["Outras rendas permanentes",outras],["Renda do investimento privado",cJ6]],alvo:C.alvo,n:C.n},
+   m:{atual:E9+p.extra-B8+p.indeniz+outras+E21/12,tot:mJ4+outras+mJ6,linhas:[["Proventos (70%)",mJ4],["Outras rendas",outras],["Renda do investimento privado",mJ6]],alvo:M.alvo,n:M.n},
+   i:{atual:E9+p.extra-B8+p.indeniz+outras+E21/12,tot:iJ4+outras+iJ6,linhas:[["Proventos (integral)",iJ4],["Outras rendas",outras],["Renda do investimento privado",iJ6]],alvo:I.alvo,n:I.n}};
 }
 /*END*/
-const D={idade:35,ret:70,teto:41845.48,sb:11596,rc:30119,sp:6000,extra:2324,outras:1000,conj:5000,indeniz:3450,
+const D={cI:35,cR:70,teto:41845.48,sb:11596,rc:30119,sp:6000,extra:2324,outras:1000,conj:5000,indeniz:3450,
  inss:8475.55,aliqIR:.275,pdIR:908.73,aliqInt:.19,pdInt:1256.86,aliqInss:.14,pdInss:215.75,aliqPC:.075,carreg:.065,irPC:.1,txPC:.03,txPriv:.05,prazoPC:240,prazoPriv:300,
  cA:1700,cS:1700,cAlvo:50000,mI:45,mR:68,mS:300000,mA:3500,mAlvo:45000,iI:50,iR:65,iS:500000,iA:2000,iAlvo:45000};
-const F=[["g1",[["idade","Idade atual"],["ret","Idade de aposentadoria"],["teto","Teto remuneratório"],["sb","Salário base"],["rc","Rem. adicional com contrib. previd."],["sp","Rem. adicional sem contrib. previd."],["extra","Extra-teto com IR"],["indeniz","Indenizações"],["outras","Outras rendas"],["conj","Renda do cônjuge"]]],
+const F=[["g1",[["teto","Teto remuneratório"],["sb","Salário base"],["rc","Rem. adicional com contrib. previd."],["sp","Rem. adicional sem contrib. previd."],["extra","Extra-teto com IR"],["indeniz","Indenizações"],["outras","Outras rendas"],["conj","Renda do cônjuge"]]],
 ["g2",[["inss","Teto INSS"],["aliqInt","Alíq. previd. (integral)"],["pdInt","Parcela dedutível (integral)"],["aliqInss","Alíq. INSS"],["pdInss","Parcela dedutível INSS"],["aliqPC","Alíq. prev. complementar"],["carreg","Taxa de carregamento"],["aliqIR","Alíq. IR"],["pdIR","Parcela dedutível IR"],["irPC","IR sobre prev. compl."],["txPC","Rentab. real a.a. prev. compl."],["txPriv","Rentab. real a.a. invest. privado"],["prazoPC","Meses de recebimento (prev. compl.)"],["prazoPriv","Meses de recebimento (privado)"]]],
-["gc",[["cA","Aporte mensal"],["cS","Saldo inicial"],["cAlvo","Renda-alvo"]]],
+["gc",[["cI","Idade atual"],["cR","Idade de aposentadoria"],["cS","Saldo inicial"],["cA","Aporte mensal"],["cAlvo","Renda-alvo"]]],
 ["gm",[["mI","Idade atual"],["mR","Idade de aposentadoria"],["mS","Saldo inicial"],["mA","Aporte mensal"],["mAlvo","Renda-alvo"]]],
 ["gi",[["iI","Idade atual"],["iR","Idade de aposentadoria"],["iS","Saldo inicial"],["iA","Aporte mensal"],["iAlvo","Renda-alvo"]]]];
 const pct=new Set(["aliqInt","aliqInss","aliqPC","carreg","aliqIR","irPC","txPC","txPriv"]);
@@ -94,7 +94,7 @@ function run(){
   const p={};Object.keys(D).forEach(k=>p[k]=get(k));
   p.per=1;
   const mk=(i,r,s,a,al,per)=>({idade:i,ret:r,saldo:s,aporte:a,alvo:al,per,n:(r-i)*per});
-  p.c=mk(p.idade,p.ret,p.cS,p.cA,p.cAlvo,13);
+  p.c=mk(p.cI,p.cR,p.cS,p.cA,p.cAlvo,13);
   p.m=mk(p.mI,p.mR,p.mS,p.mA,p.mAlvo,12);
   p.i=mk(p.iI,p.iR,p.iS,p.iA,p.iAlvo,12);
   const R=calc(p);
@@ -105,9 +105,8 @@ function run(){
     <div class="${ok?"ok":"bad"}">${pc.toFixed(0)}% da renda-alvo de ${brl(c.alvo)} (${ok?"sobra":"falta"} ${brl(Math.abs(c.tot-c.alvo))})</div>
     <div style="margin-top:8px">${c.linhas.map(([a,b])=>`<div class="row"><span>${a}</span><b>${brl(b)}</b></div>`).join("")}</div></div>`}).join("");
   document.getElementById("out").innerHTML=cards+`<div class="card"><h2>Referências</h2>
-    <div class="row"><span>Renda líquida mensal atual</span><b>${brl(R.atual)}</b></div>
-    <div class="row"><span>Aporte mensal na prev. complementar</span><b>${brl(R.H14)}</b></div>
-    <div class="row"><span>Diferença líquida (aporte base)</span><b>${brl(R.aporteBase)}</b></div></div>`;
+    <div class="row"><span>Renda líquida mensal atual</span><b>${brl(R[cur].atual)}</b></div>${cur==="c"?`
+    <div class="row"><span>Aporte mensal na prev. complementar</span><b>${brl(R.H14)}</b></div>`:""}</div></div>`;
   if(showRep)renderRep(p,R);
 }
 let cur="c",showRep=false;
