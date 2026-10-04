@@ -66,10 +66,10 @@ function irDev(P,rend){
   return imp-red;
 }
 function rem(d,P){
-  const E1=d.sb+d.rc,E5=E1-cpss(P,E1),E9=E5-irDev(P,E5);
+  const E1=d.sb+d.rc,E4=cpss(P,E1),E5=E1-E4,E9=E5-irDev(P,E5);
   const soma=d.sb+d.rc,E10=Math.min(soma+d.sp,d.teto),E11=soma<d.teto?soma:d.teto,E12=Math.min(soma,P.inss);
   const E15=cpss(P,E12),E16=(E11-E12)*P.aliqPC,E17=E10-E15-E16;
-  return{E9,E12,E15,E16,E21:E17-irDev(P,E17),B8:d.extra*P.aliqExtra,M11:irDev(P,E12-E15)};
+  return{E4,E5,E9,E12,E15,E16,E17,E21:E17-irDev(P,E17),B8:d.extra*P.aliqExtra,M11:irDev(P,E12-E15)};
 }
 function needAp(d,P,n,fixed){const f=ap=>avgPay(d.saldo,ap,P.txPriv,n,P.prazoPriv),b0=f(0),b=f(1)-b0;return b>0?Math.max(0,(d.alvo-fixed-b0)/b):null}
 function calc(s,d,P){
@@ -80,18 +80,21 @@ function calc(s,d,P){
     const part=d.pcA!=null?d.pcA:R.E16,pcAp=part*2*(1-P.carreg),pcInit=d.pcS!=null?d.pcS:pcAp;
     const pc=avgPay(pcInit,pcAp,P.txPC,n,P.prazoPC);
     const j4=(R.E12-R.E15-R.M11)/12*13+pc*(1-P.irPC);
-    return{n,aporteNec:needAp(d,P,n,j4+out),tot:j4+out+j6,linhas:[["INSS + Previdência Complementar",j4],["Outras rendas permanentes",out],["Renda do investimento privado",j6]],atual:R.E21+d.extra-R.B8+d.indeniz+out+R.E21/36+R.E21/12,part,pcAp,pcInit,E16:R.E16};
+    return{n,aporteNec:needAp(d,P,n,j4+out),tot:j4+out+j6,linhas:[["INSS + Previdência Complementar",j4],["Outras rendas permanentes",out],["Renda do investimento privado",j6]],atual:R.E21+d.extra-R.B8+d.indeniz+out+R.E21/36+R.E21/12,part,pcAp,pcInit,E16:R.E16,sal:R.E21+d.extra-R.B8,sal13:R.E21+d.extra-R.B8+R.E21/12+R.E21/36,cont:R.E15,irm:R.E17-R.E21+R.B8};
   }
-  const j4=R.E9*13/12*(s==="m"?0.7:1);
-  return{n,aporteNec:needAp(d,P,n,j4+out),tot:j4+out+j6,linhas:[[s==="m"?"Proventos (70%)":"Proventos (integral)",j4],["Outras rendas",out],["Renda do investimento privado",j6]],atual:atualM};
+  let baseM=R.E9,usouScm=false;
+  if(s==="m"&&d.scm!=null){const b5=d.scm-cpss(P,d.scm);baseM=b5-irDev(P,b5);usouScm=true}
+  const j4=baseM*13/12*(s==="m"?0.7:1);
+  return{n,aporteNec:needAp(d,P,n,j4+out),tot:j4+out+j6,linhas:[[s==="m"?"Proventos (70%)":"Proventos (integral)",j4],["Outras rendas",out],["Renda do investimento privado",j6]],atual:atualM,sal:R.E9+d.extra-R.B8,sal13:R.E9+d.extra-R.B8+R.E21/12+R.E9/36,cont:R.E4,irm:R.E5-R.E9+R.B8,baseM,usouScm};
 }
 /*END*/
 const NM={c:"Complementar",m:"Média",i:"Integralidade"};
 const COM=[["idade","Idade atual"],["ret","Idade de aposentadoria"],["saldo","Saldo atual InvestPriv"],["aporte","Aporte mensal InvestPriv"],["alvo","Renda-alvo"],["outras","Outras rendas"],["conj","Renda do cônjuge"]];
 const REM=[["teto","Teto remuneratório"],["sb","Salário base"],["rc","Rem. adicional com contrib. previd."],["sp","Rem. adicional sem contrib. previd."],["extra","Extra-teto com IR"],["indeniz","Indenizações"]];
+const SCMF=[["scm","Salário de contribuição médio (bruto, opcional)"]];
 const PCF=[["pcS","Saldo atual da PrevComple (opcional)"],["pcA","Aporte mensal do participante na PrevComple (em branco = valor apurado)"]];
 const DD={c:{idade:35,ret:70,saldo:500,aporte:500,alvo:20000},m:{idade:45,ret:68,saldo:1000,aporte:1000,alvo:15000},i:{idade:50,ret:65,saldo:500,aporte:500,alvo:15000}};
-const RD={outras:500,conj:2000,teto:41845.48,sb:5000,rc:10000,sp:0,extra:0,indeniz:1500,pcS:"",pcA:""};
+const RD={outras:500,conj:2000,teto:41845.48,sb:5000,rc:10000,sp:0,extra:0,indeniz:1500,pcS:"",pcA:"",scm:""};
 const PD={inss:8475.55,aliqPC:.075,carreg:.065,irPC:.1,aliqExtra:.275,txPC:.03,txPriv:.05,prazoPC:240,prazoPriv:300};
 const PL={inss:"Teto INSS",aliqPC:"Alíq. prev. complementar",carreg:"Taxa de carregamento",irPC:"IR sobre prev. compl.",aliqExtra:"Alíq. IR sobre extra-teto",txPC:"Rentab. real a.a. prev. compl.",txPriv:"Rentab. real a.a. invest. privado",prazoPC:"Meses de recebimento (prev. compl.)",prazoPriv:"Meses de recebimento (privado)"};
 const CPD=[[1621,.075,0],[2902.84,.09,24.33],[4354.27,.12,111.42],[8475.55,.14,198.51],[14514.30,.145,240.89],[29028.57,.165,531.18],[56605.73,.19,1256.89],[99999999,.22,2955.06]];
@@ -103,7 +106,7 @@ const inp=(id,t,v)=>`<label>${t}<input id="${id}" type="number" step="any" value
 document.getElementById("forms").innerHTML=["c","m","i"].map(s=>{
   const dv=k=>(DD[s][k]!==undefined?DD[s][k]:RD[k]);
   const g=(l)=>l.map(([k,t])=>inp(s+"_"+k,t,dv(k))).join("");
-  return `<div class="grp" id="grp_${s}"${s!=="c"?" hidden":""}><h3>Dados do regime</h3><div class="grid">${g(COM)}</div><h3>Remuneração atual</h3><div class="grid">${g(REM)}</div>${s==="c"?`<h3>Previdência complementar</h3><div class="grid">${g(PCF)}</div>`:""}</div>`}).join("");
+  return `<div class="grp" id="grp_${s}"${s!=="c"?" hidden":""}><h3>Dados do regime</h3><div class="grid">${g(COM)}</div><h3>Remuneração atual</h3><div class="grid">${g(REM)}</div>${s==="c"?`<h3>Previdência complementar</h3><div class="grid">${g(PCF)}</div>`:""}${s==="m"?`<h3>Proventos</h3><div class="grid">${g(SCMF)}</div><p style="margin:8px 0 0"><small>Em branco, os proventos usam 70% da remuneração líquida atual. Preenchido, o app calcula contribuição e IR sobre esse salário e aplica os 70%.</small></p>`:""}</div>`}).join("");
 const tab=(p,rows,t)=>`<h3>${t}</h3><div class="tw" style="max-height:none"><table><thead><tr><th>Faixa</th><th>Até (R$)</th><th>Alíquota (%)</th><th>Parcela a deduzir (R$)</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td><input id="${p}${i}_ate" type="number" step="any" value="${r[0]}" style="margin:0"></td><td><input id="${p}${i}_al" type="number" step="any" value="${+(r[1]*100).toFixed(4)}" style="margin:0"></td><td><input id="${p}${i}_pd" type="number" step="any" value="${r[2]}" style="margin:0"></td></tr>`).join("")}</tbody></table></div>`;
 document.getElementById("gp").innerHTML=`<h3>Gerais</h3><div class="grid">${Object.keys(PD).map(k=>inp(k,PL[k],pct.has(k)?+(PD[k]*100).toFixed(6):PD[k])).join("")}</div>`+tab("cp",CPD,"Tabela da contribuição previdenciária (CPSS)")+tab("ir",IRD,"Tabela do Imposto de Renda")+`<h3>Redução do IR e desconto simplificado</h3><div class="grid">${Object.keys(IRPD).map(k=>inp("irp_"+k,IRPL[k],IRPD[k])).join("")}</div>`;
 const brl=v=>v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
@@ -118,7 +121,9 @@ function run(){
   P.irp={};Object.keys(IRPD).forEach(k=>P.irp[k]=get("irp_"+k));
   const d={};[...COM,...REM].forEach(([k])=>d[k]=get(cur+"_"+k));
   if(cur==="c"){d.pcS=opt("c_pcS");d.pcA=opt("c_pcA")}
+  if(cur==="m")d.scm=opt("m_scm");
   const r=calc(cur,d,P);
+  if(cur==="m")document.getElementById("m_scm").placeholder="Opcional (em branco: 70% da remuneração atual)";
   if(cur==="c"){document.getElementById("c_pcA").placeholder=brl(r.E16)+" (apurado)";document.getElementById("c_pcS").placeholder="Opcional"}
   const pc=Math.min(100,r.tot/d.alvo*100),ok=r.tot>=d.alvo;
   document.getElementById("out").innerHTML=`<div class="card"><h2>${NM[cur]}</h2><div class="big">${brl(r.tot)}</div>
@@ -127,7 +132,12 @@ function run(){
     ${r.aporteNec===null?"":`<div style="margin-top:10px;padding:10px 12px;border-left:4px solid var(--ac);background:var(--bg);border-radius:6px"><div style="font-size:12px;color:var(--mut)">Aporte mensal necessário no investimento privado para atingir a renda-alvo</div><div style="font-size:20px;font-weight:700">${r.aporteNec>0?brl(r.aporteNec):"Nenhum aporte adicional"}</div><div style="font-size:13px;color:var(--mut)">Aporte atual: ${brl(d.aporte)}${r.aporteNec>d.aporte?` (faltam ${brl(r.aporteNec-d.aporte)} por mês)`:" (suficiente)"}</div></div>`}
     <div style="margin-top:8px">${r.linhas.map(([a,b])=>`<div class="row"><span>${a}</span><b>${brl(b)}</b></div>`).join("")}</div></div>
     <div class="card"><h2>Referências</h2>
-    <div class="row"><span>Renda líquida mensal atual</span><b>${brl(r.atual)}</b></div>${cur==="c"?`
+    <div class="row"><span>Salário mensal líquido</span><b>${brl(r.sal)}</b></div>
+    <div class="row"><span>Salário + 13º e 1/3 de férias mensalizados</span><b>${brl(r.sal13)}</b></div>
+    <div class="row"><span>Contribuição previdenciária mensal</span><b>${brl(r.cont)}</b></div>
+    <div class="row"><span>IR mensal</span><b>${brl(r.irm)}</b></div>
+    <div class="row"><span>Renda líquida mensal atual (com indenizações, outras rendas e cônjuge)</span><b>${brl(r.atual)}</b></div>${cur==="m"?`
+    <div class="row"><span>${r.usouScm?"Base dos proventos: líquido do salário de contribuição médio":"Base dos proventos: remuneração líquida atual"}</span><b>${brl(r.baseM)}</b></div>`:""}${cur==="c"?`
     <div class="row"><span>Aporte mensal do participante</span><b>${brl(r.part)}</b></div>
     <div class="row"><span>Investido por mês (x2 patrocinador, menos carregamento)</span><b>${brl(r.pcAp)}</b></div>`:""}</div>`;
   if(showRep)renderRep(d,P,r);
