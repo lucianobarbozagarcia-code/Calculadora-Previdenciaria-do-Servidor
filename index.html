@@ -150,7 +150,8 @@ const APF=[["idadeC","Idade do cônjuge"],["filhos","Quantidade de filhos menore
 const RD={outras:500,conj:2000,teto:41845.48,sb:5000,rc:10000,sp:0,extra:0,indeniz:1500,pcS:"",pcA:"",scm:"",idadeC:65,filhos:0};
 const PD={inss:8475.55,aliqPC:.075,carreg:.065,irPC:.1,aliqExtra:.275,txPC:.03,txPriv:.05,rpTx:.05,cpssIn:988.07,ir65:1903.98,prazoPC:240,prazoPriv:300};
 const PL={inss:"Teto INSS",aliqPC:"Alíq. prev. complementar",carreg:"Taxa de carregamento",irPC:"IR sobre prev. compl.",aliqExtra:"Alíq. IR sobre extra-teto",txPC:"Rentab. real a.a. prev. compl.",txPriv:"Rentab. real a.a. invest. privado",rpTx:"Taxa da renda vitalícia (% a.a.)",cpssIn:"Aposentado: parcela fixa a deduzir da CPSS de inativo (R$)",ir65:"Aposentado: parcela isenta de IR a partir de 65 anos (R$ ao mês)",prazoPC:"Meses de recebimento (prev. compl.)",prazoPriv:"Meses de recebimento (privado)"};
-const CPD=[[1621,.075,0],[2902.84,.09,24.33],[4354.27,.12,111.42],[8475.55,.14,198.51],[14514.30,.145,240.89],[29028.57,.165,531.18],[56605.73,.19,1256.89],[99999999,.22,2955.06]];
+const CPD_FED=[[1621,.075,0],[2902.84,.09,24.33],[4354.27,.12,111.42],[8475.55,.14,198.51],[14514.30,.145,240.89],[29028.57,.165,531.18],[56605.73,.19,1256.89],[99999999,.22,2955.06]];
+let CPD=CPD_FED.map(r=>r.slice());
 const IRD=[[2428.80,0,0],[2826.65,.075,182.16],[3751.05,.15,394.16],[4664.68,.225,675.49],[99999999,.275,908.73]];
 const IRPD={l1:5000,red1:312.89,l2:7350,k:978.62,c:.133145,simp:607.20};
 const IRPL={l1:"Limite com redução que zera o imposto (R$)",red1:"Redução máxima até esse limite (R$)",l2:"Limite superior da redução decrescente (R$)",k:"Constante da fórmula da redução (R$)",c:"Coeficiente da fórmula da redução",simp:"Valor do desconto simplificado mensal (R$), usado só se aplicado"};
@@ -171,7 +172,64 @@ document.getElementById("forms").innerHTML=["c","m","i","a"].map(s=>{
   const g=(l)=>l.map(([k,t])=>inp(s+"_"+k,(LBL[s]&&LBL[s][k])||t,dv(k))).join("");
   return `<div class="grp" id="grp_${s}"${s!=="c"?" hidden":""}><h3>Dados do regime</h3><div class="grid">${g(COM)}</div><h3>Remuneração atual</h3><div class="grid">${g(REM)}</div>${s==="a"?`<h3>Cônjuge e dependentes (pensão)</h3><div class="grid">${g(APF)}</div>`:""}${s==="c"?`<h3>Previdência complementar</h3><div class="grid">${g(PCF)}</div>`+VRHTML:""}${s==="m"?`<h3>Proventos</h3><div class="grid">${g(SCMF)}</div><p style="margin:8px 0 0"><small>Em branco, os proventos são 70% da remuneração líquida atual. Preenchido (à mão ou pela grade abaixo), o valor é a aposentadoria bruta pela média: o app desconta previdência e IR e não aplica os 70%.</small></p>`+SCHTML:""}</div>`}).join("");
 const tab=(p,rows,t)=>`<h3>${t}</h3><div class="tw" style="max-height:none"><table><thead><tr><th>Faixa</th><th>Até (R$)</th><th>Alíquota (%)</th><th>Parcela a deduzir (R$)</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td><input id="${p}${i}_ate" type="number" step="any" value="${r[0]}" style="margin:0"></td><td><input id="${p}${i}_al" type="number" step="any" value="${+(r[1]*100).toFixed(4)}" style="margin:0"></td><td><input id="${p}${i}_pd" type="number" step="any" value="${r[2]}" style="margin:0"></td></tr>`).join("")}</tbody></table></div>`;
-document.getElementById("gp").innerHTML=`<h3>Gerais</h3><div class="grid">${Object.keys(PD).map(k=>inp(k,PL[k],pct.has(k)?+(PD[k]*100).toFixed(6):PD[k])).join("")}</div>`+tab("cp",CPD,"Tabela da contribuição previdenciária (CPSS)")+tab("ir",IRD,"Tabela do Imposto de Renda")+`<h3>Redução do IR e desconto simplificado</h3><div class="grid"><label>Aplicar o desconto simplificado mensal do IR? (padrão: Não)<select id="irp_usa"><option>Não</option><option>Sim</option></select></label>${Object.keys(IRPD).map(k=>inp("irp_"+k,IRPL[k],IRPD[k])).join("")}</div>`;
+const SM=1621;
+const T14="Alíquota única de 14% sobre toda a base de contribuição (levantamento do Dieese, 2026).";
+const UFD={
+FED:{n:"Federal (União)",tp:"fed",st:"ok",lim:"teto",obs:"Tabela da União, Portaria Interministerial MPS/MF nº 13/2026 (7,5% a 22%)."},
+RS:{n:"Rio Grande do Sul",tp:"fed",st:"ok",lim:{sm:1},obs:"Mesma tabela da União (7,5% a 22%), conforme informado; a IN IPE Prev 02/2026 tem parcelas com diferença de centavos."},
+SP:{n:"São Paulo",tp:"band",st:"ok",lim:"teto",b:[[1621,.11],[4174.58,.12],[8475.55,.14],[99999999,.16]],obs:"Sefaz-SP, LC 1.012/2007 (LC 1.354/2020), vigência 01/2026: 11% até R$ 1.621,00; 12% até R$ 4.174,58; 14% até R$ 8.475,55; 16% acima."},
+AC:{n:"Acre",tp:"flat",a:.14,st:"ok",lim:"teto",obs:T14},
+AL:{n:"Alagoas",tp:"flat",a:.14,st:"ok",lim:"teto",obs:T14},
+AP:{n:"Amapá",tp:"flat",a:.14,st:"ok",lim:"teto",obs:T14},
+AM:{n:"Amazonas",tp:"flat",a:.14,st:"ok",lim:"teto",obs:T14},
+BA:{n:"Bahia",tp:"band",st:"aprox",lim:{sm:3},b:[[15000,.14],[99999999,.15]],obs:"14%; o levantamento do Dieese cita 15% acima de R$ 15 mil. Tratei como alíquota marginal (14% até R$ 15.000 e 15% sobre o excedente). Confirme na lei estadual (Lei 14.250/2020)."},
+CE:{n:"Ceará",tp:"flat",a:.14,st:"ok",lim:{sm:2},obs:T14},
+DF:{n:"Distrito Federal",tp:"flat",a:.14,st:"ok",lim:{sm:1},obs:T14+" Para inativos, o DF cobra 11% até o teto do RGPS e 14% sobre o excedente; essa regra não está modelada."},
+ES:{n:"Espírito Santo",tp:"flat",a:.14,st:"ok",lim:"teto",obs:T14},
+GO:{n:"Goiás",tp:"flat",a:.1425,st:"ok",lim:{v:3000},obs:"Alíquota única de 14,25% sobre toda a base (levantamento do Dieese, 2026)."},
+MA:{n:"Maranhão",tp:"fed",st:"aprox",lim:"teto",obs:"Escala progressiva de 7,5% a 22%, como a da União. Assumi as faixas iguais às da União; confirme na norma estadual (LC 219/2019)."},
+MT:{n:"Mato Grosso",tp:"flat",a:.14,st:"ok",lim:{v:3000},obs:T14},
+MS:{n:"Mato Grosso do Sul",tp:"flat",a:.14,st:"ok",lim:{sm:1},obs:T14},
+MG:{n:"Minas Gerais",tp:"fed",st:"pend",lim:{sm:3},obs:"Minas tem tabela progressiva própria (11% a 16%), mas não consegui confirmar as faixas de 2026. Estou usando a tabela da União. Edite as faixas na tabela abaixo (LC 156/2020 e atualizações)."},
+PA:{n:"Pará",tp:"flat",a:.14,st:"ok",lim:"teto",obs:T14},
+PB:{n:"Paraíba",tp:"flat",a:.14,st:"ok",lim:"teto",obs:T14},
+PR:{n:"Paraná",tp:"flat",a:.14,st:"ok",lim:{sm:3},obs:T14},
+PE:{n:"Pernambuco",tp:"flat",a:.14,st:"ok",lim:"teto",obs:T14},
+PI:{n:"Piauí",tp:"flat",a:.14,st:"ok",lim:{sm:1},obs:T14},
+RJ:{n:"Rio de Janeiro",tp:"flat",a:.14,st:"ok",lim:"teto",obs:T14},
+RN:{n:"Rio Grande do Norte",tp:"band",st:"aprox",lim:{v:4862.18},b:[[4862.18,.11],[8475.55,.14],[20837.9,.15],[41675.8,.16],[99999999,.18]],obs:"Lei 11.109/2022 (11% a 18%). As faixas de 2026 foram calculadas aplicando os reajustes de 2025 (4,77%) e 2026 (3,90%) à tabela do IPERN; o método reproduz R$ 4.862,18 e R$ 8.475,55. Confirme na Portaria 001/2026 do IPERN."},
+RO:{n:"Rondônia",tp:"flat",a:.14,st:"ok",lim:{sm:3},obs:T14},
+RR:{n:"Roraima",tp:"band",st:"aprox",lim:"teto",b:[[5000,.11],[7500,.115],[12000,.12],[16000,.125],[19000,.13],[35000,.135],[99999999,.14]],obs:"LC 301/2021 (11% a 14%): 11% até R$ 5.000; 11,5% até R$ 7.500; 12% até R$ 12.000; 13% de R$ 16.000,01 a R$ 19.000; 13,5% até R$ 35.000; 14% acima. A faixa de R$ 12.000,01 a R$ 16.000 (12,5%) foi inferida e os valores são nominais, sem atualização."},
+SC:{n:"Santa Catarina",tp:"flat",a:.14,st:"ok",lim:{sm:3},obs:T14},
+SE:{n:"Sergipe",tp:"flat",a:.14,st:"ok",lim:"teto",obs:T14},
+TO:{n:"Tocantins",tp:"flat",a:.14,st:"ok",lim:"teto",obs:T14}
+};
+const UF_ORD=["FED"].concat(Object.keys(UFD).filter(k=>k!=="FED").sort((a,b)=>UFD[a].n.localeCompare(UFD[b].n,"pt-BR")));
+function ufRows(c){
+  const u=UFD[c];
+  if(u.tp==="fed")return CPD_FED.map(r=>r.slice());
+  if(u.tp==="flat")return[[99999999,u.a,0]];
+  return u.b.map((x,k)=>{let pd=0;for(let j=0;j<k;j++)pd+=(x[1]-u.b[j][1])*(u.b[j][0]-(j?u.b[j-1][0]:0));return[x[0],x[1],Math.round(pd*100)/100]});
+}
+function ufLim(c){const l=UFD[c].lim;return l==="teto"?get("inss"):(l.sm?l.sm*SM:l.v)}
+function ufMsg(c){
+  const u=UFD[c],e=document.getElementById("uf_msg");
+  e.className="msg "+(u.st==="ok"?"ok":(u.st==="pend"?"bad":""));
+  e.innerHTML=(u.st==="ok"?"":(u.st==="pend"?"<b>Atenção:</b> tabela não confirmada. ":"<b>Atenção:</b> dado parcialmente confirmado. "))+u.obs;
+}
+function setUF(c){
+  CPD=ufRows(c);renderCp();
+  const L=ufLim(c);let i=0;CPD.forEach(r=>{if(r[0]<L)i++});const r=CPD[Math.min(i,CPD.length-1)];
+  document.getElementById("cpssIn").value=Math.max(0,Math.round((L*r[1]-r[2])*100)/100);
+  ufMsg(c);
+}
+function renderCp(){
+  const b=document.getElementById("cp_box");
+  b.innerHTML=tab("cp",CPD,"Tabela da contribuição previdenciária (CPSS)");
+  b.querySelectorAll("input").forEach(i=>i.addEventListener("input",run));
+}
+document.getElementById("gp").innerHTML=`<h3>Ente do servidor</h3><div class="grid"><label>Estado do servidor ou Federal (define a tabela de contribuição previdenciária)<select id="uf">${UF_ORD.map(c=>`<option value="${c}">${UFD[c].n}</option>`).join("")}</select></label></div><p class="msg" id="uf_msg"></p><h3>Gerais</h3><div class="grid">${Object.keys(PD).map(k=>inp(k,PL[k],pct.has(k)?+(PD[k]*100).toFixed(6):PD[k])).join("")}</div>`+`<div id="cp_box"></div>`+tab("ir",IRD,"Tabela do Imposto de Renda")+`<h3>Redução do IR e desconto simplificado</h3><div class="grid"><label>Aplicar o desconto simplificado mensal do IR? (padrão: Não)<select id="irp_usa"><option>Não</option><option>Sim</option></select></label>${Object.keys(IRPD).map(k=>inp("irp_"+k,IRPL[k],IRPD[k])).join("")}</div>`;
+renderCp();ufMsg("FED");
 const brl=v=>v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 function get(k){const v=parseFloat(document.getElementById(k).value);const x=isNaN(v)?0:v;return (pct.has(k)||k.endsWith("_al"))?x/100:x}
 const opt=k=>document.getElementById(k).value.trim()===""?null:get(k);
@@ -479,6 +537,7 @@ $v("sc_clear").addEventListener("click",()=>{Object.keys(SCV).forEach(k=>delete 
 $v("sc_est").addEventListener("input",()=>{if(Object.keys(SCV).length)scCalc()});
 $v("sc_sexo").addEventListener("change",()=>{if(scAuto)scCalc()});
 $v("m_scm").addEventListener("input",()=>{scAuto=false});
+$v("uf").addEventListener("change",e=>{setUF(e.target.value);run()});
 ["m_idade","m_ret","m_sb","m_rc","m_sp","m_teto"].forEach(id=>$v(id).addEventListener("input",()=>{if(scAuto)scCalc()}));
 document.getElementById("repBtn").addEventListener("click",()=>{showRep=true;run();document.getElementById("rep").scrollIntoView({behavior:"smooth"})});
 document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>{
